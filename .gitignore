@@ -1,0 +1,30 @@
+# 敏感配置（含密码）
+application-dev.yml
+application-prod.yml
+*.local.properties
+
+# 编译产物
+backend/target/
+front/node_modules/
+front/dist/
+*.class
+*.jar
+
+# IDE 配置（保留必要的，排除个人配置）
+.idea/workspace.xml
+.idea/tasks.xml
+*.iml
+
+# 日志
+*.log
+logs/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# ZLMediaKit 生成文件
+*.mp4
+*.flv
+*.hls
+recordings/

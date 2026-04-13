@@ -1,0 +1,14 @@
+/* src/style.css */
+html, body, #app {
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden; /* 防止出现双滚动条 */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* 统一输入框的 outline */
+*:focus {
+    outline: none;
+}

@@ -1,0 +1,11 @@
+server:
+  # 后端服务运行的端口，建议 8081，避开默认的 8080 冲突
+  port: 8081
+
+zlm:
+  host: 192.168.6.132  # 再次确认虚拟机 IP
+  httpPort: 9999
+  secret: 8DCeWRJCbGXJtgRBqDn0k9sii7GrNHOR  # 填入刚查到的这一串
+camera:
+  username: admin
+  password: TDKb2101357  # 填入你那个折磨你的密码
