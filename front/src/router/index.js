@@ -1,26 +1,81 @@
-import { createRouter, createWebHistory } from 'vue-router';
-import Login from '../views/Login.vue';
-import Monitor from '../views/Monitor.vue';
+import { createRouter, createWebHistory } from 'vue-router'
+import Login from '../views/Login.vue'
+import Layout from '../views/Layout.vue'
+import Monitor from '../views/Monitor.vue'
+import DeviceManage from '../views/DeviceManage.vue'
+import Playback from '../views/Playback.vue'
+import Traffic from '../views/Traffic.vue'
+import AIAnalysis from '../views/AIAnalysis.vue'
+import UserCenter from '../views/UserCenter.vue'
+import UserManage from '../views/UserManage.vue'
+
+// 路由守卫
+const checkAuth = (to, from, next) => {
+    const isLogin = localStorage.getItem('isLogin')
+    if (to.path !== '/login' && isLogin !== 'true') {
+        next('/login')
+    } else {
+        next()
+    }
+}
 
 const routes = [
-    { path: '/', redirect: '/login' },
-    { path: '/login', component: Login },
-    { path: '/monitor', component: Monitor }
-];
+    {
+        path: '/login',
+        name: 'Login',
+        component: Login
+    },
+    {
+        path: '/',
+        redirect: '/monitor'
+    },
+    {
+        path: '/monitor',
+        component: Layout,
+        beforeEnter: checkAuth,
+        children: [{ path: '', component: Monitor, meta: { title: '监控大屏', icon: '📹' } }]
+    },
+    {
+        path: '/devices',
+        component: Layout,
+        beforeEnter: checkAuth,
+        children: [{ path: '', component: DeviceManage, meta: { title: '设备管理', icon: '📷' } }]
+    },
+    {
+        path: '/playback',
+        component: Layout,
+        beforeEnter: checkAuth,
+        children: [{ path: '', component: Playback, meta: { title: '录像回放', icon: '🎬' } }]
+    },
+    {
+        path: '/traffic',
+        component: Layout,
+        beforeEnter: checkAuth,
+        children: [{ path: '', component: Traffic, meta: { title: '流量监控', icon: '📊' } }]
+    },
+    {
+        path: '/ai-analysis',
+        component: Layout,
+        beforeEnter: checkAuth,
+        children: [{ path: '', component: AIAnalysis, meta: { title: 'AI分析', icon: '🤖' } }]
+    },
+    {
+        path: '/user-center',
+        component: Layout,
+        beforeEnter: checkAuth,
+        children: [{ path: '', component: UserCenter, meta: { title: '个人中心', icon: '👤' } }]
+    },
+    {
+        path: '/users',
+        component: Layout,
+        beforeEnter: checkAuth,
+        children: [{ path: '', component: UserManage, meta: { title: '用户管理', icon: '👥' } }]
+    }
+]
 
 const router = createRouter({
     history: createWebHistory(),
     routes
-});
+})
 
-// 路由守卫：没登录想进 monitor 会被踢回 login
-router.beforeEach((to, from, next) => {
-    const isLogin = localStorage.getItem('isLogin');
-    if (to.path === '/monitor' && !isLogin) {
-        next('/login');
-    } else {
-        next();
-    }
-});
-
-export default router;
+export default router

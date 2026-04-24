@@ -46,34 +46,24 @@
           <div class="login-form">
             <div class="input-group">
               <label>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                   <path d="M20 21V19C20 16.8 18.2 15 16 15H8C5.8 15 4 16.8 4 19V21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                   <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="1.5"/>
                 </svg>
                 账号
               </label>
-              <input
-                  v-model="form.username"
-                  type="text"
-                  placeholder="请输入管理员账号"
-                  @keyup.enter="handleLogin"
-              />
+              <input v-model="form.username" type="text" placeholder="请输入管理员账号" @keyup.enter="handleLogin" />
             </div>
 
             <div class="input-group">
               <label>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                   <rect x="5" y="11" width="14" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/>
                   <path d="M7 11V8C7 5.2 9.2 3 12 3C14.8 3 17 5.2 17 8V11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                 </svg>
                 密码
               </label>
-              <input
-                  v-model="form.password"
-                  type="password"
-                  placeholder="请输入安全密码"
-                  @keyup.enter="handleLogin"
-              />
+              <input v-model="form.password" type="password" placeholder="请输入安全密码" @keyup.enter="handleLogin" />
             </div>
 
             <div class="form-options">
@@ -81,12 +71,12 @@
                 <input type="checkbox" v-model="rememberMe">
                 <span>记住密码</span>
               </label>
-              <a href="#" class="forgot-link">忘记密码？</a>
+              <a href="#" class="forgot-link" @click.prevent>忘记密码？</a>
             </div>
 
             <button class="login-btn" @click="handleLogin">
               <span>登 录</span>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                 <path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </button>
@@ -116,65 +106,48 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { reactive, ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 
-const router = useRouter();
+const router = useRouter()
 const form = reactive({
   username: '',
   password: ''
-});
-const rememberMe = ref(false);
+})
+const rememberMe = ref(false)
 
-// 检查本地存储
 const checkRemembered = () => {
-  const savedUsername = localStorage.getItem('savedUsername');
-  const savedPassword = localStorage.getItem('savedPassword');
+  const savedUsername = localStorage.getItem('savedUsername')
+  const savedPassword = localStorage.getItem('savedPassword')
   if (savedUsername && savedPassword) {
-    form.username = savedUsername;
-    form.password = savedPassword;
-    rememberMe.value = true;
+    form.username = savedUsername
+    form.password = savedPassword
+    rememberMe.value = true
   }
-};
+}
 
 const handleLogin = () => {
-  // 模拟登录验证（正式环境应该调用后端API）
   if (form.username === 'admin' && form.password === '123456') {
-    // 保存登录状态
-    localStorage.setItem('isLogin', 'true');
-    localStorage.setItem('userName', form.username);
+    localStorage.setItem('isLogin', 'true')
+    localStorage.setItem('userName', form.username)
 
-    // 记住密码功能
     if (rememberMe.value) {
-      localStorage.setItem('savedUsername', form.username);
-      localStorage.setItem('savedPassword', form.password);
+      localStorage.setItem('savedUsername', form.username)
+      localStorage.setItem('savedPassword', form.password)
     } else {
-      localStorage.removeItem('savedUsername');
-      localStorage.removeItem('savedPassword');
+      localStorage.removeItem('savedUsername')
+      localStorage.removeItem('savedPassword')
     }
 
-    // 添加登录成功动画
-    const btn = document.querySelector('.login-btn');
-    btn.style.transform = 'scale(0.95)';
-    setTimeout(() => {
-      router.push('/monitor');
-    }, 200);
+    router.push('/monitor')
   } else {
-    // 错误提示动画
-    const inputs = document.querySelectorAll('.input-group input');
-    inputs.forEach(input => {
-      input.style.borderColor = '#ef4444';
-      setTimeout(() => {
-        input.style.borderColor = '';
-      }, 500);
-    });
-
-    alert('❌ 账号或密码错误\n\n演示账号：admin\n演示密码：123456');
+    alert('❌ 账号或密码错误\n\n演示账号：admin\n演示密码：123456')
   }
-};
+}
 
-// 页面加载时检查记住的账号
-checkRemembered();
+onMounted(() => {
+  checkRemembered()
+})
 </script>
 
 <style scoped>
@@ -196,7 +169,6 @@ checkRemembered();
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-/* 背景装饰 */
 .bg-gradient {
   position: absolute;
   top: 0;
@@ -234,7 +206,6 @@ checkRemembered();
   50% { transform: translate(20px, -20px) scale(1.05); }
 }
 
-/* 主容器 */
 .login-wrapper {
   display: flex;
   max-width: 1100px;
@@ -247,7 +218,6 @@ checkRemembered();
   z-index: 10;
 }
 
-/* 左侧品牌区 */
 .brand-section {
   flex: 1;
   background: linear-gradient(135deg, rgba(66, 185, 131, 0.95), rgba(45, 143, 100, 0.95));
@@ -259,10 +229,6 @@ checkRemembered();
 
 .brand-icon {
   margin-bottom: 24px;
-}
-
-.brand-icon svg {
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.1));
 }
 
 .brand-text h1 {
@@ -300,7 +266,6 @@ checkRemembered();
   border-radius: 50%;
 }
 
-/* 右侧登录区 */
 .login-section {
   flex: 1;
   display: flex;
@@ -329,11 +294,6 @@ checkRemembered();
 .login-header p {
   font-size: 14px;
   color: #6c7a8e;
-}
-
-/* 表单样式 */
-.login-form {
-  margin-bottom: 24px;
 }
 
 .input-group {
@@ -372,11 +332,6 @@ checkRemembered();
   box-shadow: 0 0 0 3px rgba(66, 185, 131, 0.1);
 }
 
-.input-group input::placeholder {
-  color: #a0aec0;
-}
-
-/* 表单选项 */
 .form-options {
   display: flex;
   justify-content: space-between;
@@ -404,15 +359,8 @@ checkRemembered();
   font-size: 13px;
   color: #42b983;
   text-decoration: none;
-  transition: color 0.3s;
 }
 
-.forgot-link:hover {
-  color: #2d8f64;
-  text-decoration: underline;
-}
-
-/* 登录按钮 */
 .login-btn {
   width: 100%;
   padding: 14px;
@@ -428,19 +376,6 @@ checkRemembered();
   justify-content: center;
   gap: 8px;
   transition: all 0.3s;
-  position: relative;
-  overflow: hidden;
-}
-
-.login-btn::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-  transition: left 0.5s;
 }
 
 .login-btn:hover {
@@ -448,15 +383,6 @@ checkRemembered();
   box-shadow: 0 8px 20px rgba(66, 185, 131, 0.4);
 }
 
-.login-btn:hover::before {
-  left: 100%;
-}
-
-.login-btn:active {
-  transform: translateY(0);
-}
-
-/* 演示账号 */
 .demo-account {
   margin-top: 24px;
   padding: 16px;
@@ -470,24 +396,14 @@ checkRemembered();
   font-weight: 600;
   color: #6c7a8e;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 12px;
   text-align: center;
+  margin-bottom: 12px;
 }
 
 .demo-info {
   display: flex;
   justify-content: center;
   gap: 24px;
-}
-
-.demo-item {
-  font-size: 13px;
-  color: #4a5a6e;
-}
-
-.demo-item span {
-  color: #6c7a8e;
 }
 
 .demo-item code {
@@ -500,11 +416,11 @@ checkRemembered();
   font-weight: 600;
 }
 
-/* 底部 */
 .login-footer {
   text-align: center;
   padding-top: 24px;
   border-top: 1px solid #e2e8f0;
+  margin-top: 24px;
 }
 
 .login-footer p {
@@ -512,23 +428,10 @@ checkRemembered();
   color: #a0aec0;
 }
 
-/* 响应式 */
 @media (max-width: 768px) {
   .login-wrapper {
     flex-direction: column;
     width: 95%;
-  }
-
-  .brand-section {
-    padding: 32px 24px;
-  }
-
-  .brand-text h1 {
-    font-size: 24px;
-  }
-
-  .login-section {
-    padding: 32px 24px;
   }
 }
 </style>

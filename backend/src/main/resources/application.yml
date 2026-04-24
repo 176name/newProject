@@ -1,11 +1,32 @@
 server:
-  # 后端服务运行的端口，建议 8081，避开默认的 8080 冲突
   port: 8081
 
+spring:
+  datasource:
+    # 强烈建议用 127.0.0.1 代替 localhost，避免 socket 问题
+    url: jdbc:mysql://localhost:3306/streaming_db?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: 123456ddfdfdfdf
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      auto-commit: true
+      connection-timeout: 30000
+      maximum-pool-size: 10
+
 zlm:
-  host: 192.168.6.132  # 再次确认虚拟机 IP
+  host: 192.168.6.133
   httpPort: 9999
-  secret: 8DCeWRJCbGXJtgRBqDn0k9sii7GrNHOR  # 填入刚查到的这一串
-camera:
-  username: admin
-  password: TDKb2101357  # 填入你那个折磨你的密码
+  secret: 8DCeWRJCbGXJtgRBqDn0k9sii7GrNHOR
+
+aes:
+  secret-key: 1234567890123456
+# 千问 API 配置（可选，不配置则 AI 功能不可用）
+qwen:
+  api-key: sk-b25a64cd24264f7a82cbc23e491b915b
+
+test:
+  message: hello
+
+# 添加这一行
+server-ip: 192.168.6.133
+
