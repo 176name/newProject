@@ -3,7 +3,6 @@ server:
 
 spring:
   datasource:
-    # 强烈建议用 127.0.0.1 代替 localhost，避免 socket 问题
     url: jdbc:mysql://localhost:3306/streaming_db?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
     password: 123456ddfdfdfdf
@@ -12,14 +11,18 @@ spring:
       auto-commit: true
       connection-timeout: 30000
       maximum-pool-size: 10
+  # WebSocket 配置（合并到这里）
+  websocket:
+    enabled: true
 
 zlm:
-  host: 192.168.6.133
+  host: 192.168.6.138
   httpPort: 9999
   secret: 8DCeWRJCbGXJtgRBqDn0k9sii7GrNHOR
 
 aes:
   secret-key: 1234567890123456
+
 # 千问 API 配置（可选，不配置则 AI 功能不可用）
 qwen:
   api-key: sk-b25a64cd24264f7a82cbc23e491b915b
@@ -27,6 +30,17 @@ qwen:
 test:
   message: hello
 
-# 添加这一行
-server-ip: 192.168.6.133
+# 服务器 IP
+server-ip: 192.168.6.138
 
+# JWT 配置
+jwt:
+  secret: streaming-platform-secret-key-2024
+  expiration: 604800000  # 7天
+
+# AI Python 引擎配置
+ai:
+  python:
+    url: http://localhost:5001
+  detect:
+    device-id: 1

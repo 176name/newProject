@@ -28,7 +28,7 @@ public class PlaybackController {
     private JdbcTemplate jdbcTemplate;
 
     // 从配置文件读取服务器 IP
-    @Value("${server-ip:192.168.6.133}")
+    @Value("${server-ip:192.168.6.138}")
     private String serverIp;
 
     private int nginxPort = 8888;

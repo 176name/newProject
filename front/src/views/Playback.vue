@@ -319,7 +319,7 @@ const selectRecord = async (record) => {
   if (record.file_path) {
     // 写死 Linux 服务器 IP
     let relativePath = record.file_path.replace('/opt/media/bin/www/record/', '')
-    videoUrl.value = `http://192.168.6.133:8888/record/${relativePath}`
+    videoUrl.value = `http://192.168.6.138:8888/record/${relativePath}`
     console.log('播放地址:', videoUrl.value)
   } else {
     videoUrl.value = ''

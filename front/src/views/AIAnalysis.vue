@@ -213,7 +213,7 @@ import axios from 'axios'
 
 // ========== 配置 ==========
 // 写死 Linux 服务器 IP
-const API_BASE = 'http://192.168.6.133:8081/api'
+const API_BASE = 'http://192.168.6.138:8081/api'
 
 // ========== 数据状态 ==========
 const analyzing = ref(false)

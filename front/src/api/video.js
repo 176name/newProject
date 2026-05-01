@@ -3,7 +3,7 @@ import axios from 'axios';
 
 // 写死 Linux 服务器 IP
 const request = axios.create({
-    baseURL: 'http://192.168.6.133:8081'
+    baseURL: 'http://192.168.6.138:8081'
 });
 
 // ========== 设备管理 API ==========

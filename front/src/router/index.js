@@ -8,6 +8,8 @@ import Traffic from '../views/Traffic.vue'
 import AIAnalysis from '../views/AIAnalysis.vue'
 import UserCenter from '../views/UserCenter.vue'
 import UserManage from '../views/UserManage.vue'
+import FaceManage from '../views/FaceManage.vue'
+import Screenshots from '../views/Screenshots.vue'
 
 // 路由守卫
 const checkAuth = (to, from, next) => {
@@ -70,6 +72,21 @@ const routes = [
         component: Layout,
         beforeEnter: checkAuth,
         children: [{ path: '', component: UserManage, meta: { title: '用户管理', icon: '👥' } }]
+    },
+    // ========== 新增路由（不使用 Layout，独立页面）==========
+    {
+        path: '/face-manage',
+        name: 'FaceManage',
+        component: FaceManage,
+        beforeEnter: checkAuth,
+        meta: { title: '人脸管理', icon: '😀' }
+    },
+    {
+        path: '/screenshots',
+        name: 'Screenshots',
+        component: Screenshots,
+        beforeEnter: checkAuth,
+        meta: { title: '告警截图', icon: '📸' }
     }
 ]
 

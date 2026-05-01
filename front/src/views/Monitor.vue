@@ -1,5 +1,6 @@
 <template>
   <div class="monitor-container">
+    <!-- 左侧设备列表 -->
     <div class="device-panel">
       <div class="panel-header">
         <div class="header-title">
@@ -16,7 +17,6 @@
           <button class="add-btn" @click="goToDeviceManage">+</button>
         </div>
       </div>
-
       <div class="device-list">
         <div
             v-for="device in sortedDevices"
@@ -34,7 +34,6 @@
           </div>
         </div>
       </div>
-
       <div class="panel-footer">
         <button class="add-device-btn" @click="goToDeviceManage">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -45,6 +44,7 @@
       </div>
     </div>
 
+    <!-- 中间播放器 -->
     <div class="player-panel">
       <div class="video-header">
         <div class="live-badge">
@@ -56,7 +56,6 @@
           <span class="resolution">1920x1080</span>
         </div>
         <div class="video-actions">
-          <!-- 录制按钮 -->
           <button @click="toggleRecording" class="action-btn" :class="{ recording: isRecording }" :title="isRecording ? '停止录制' : '开始录制'">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <circle cx="12" cy="12" r="8" v-if="!isRecording"/>
@@ -101,11 +100,12 @@
       <div class="video-footer">
         <div class="fps-info">
           <span>📡 实时流 (HTTP-FLV)</span>
-          <span style="color: #42b983">⚡ 修正模式：强制绕过 Nginx</span>
+          <span style="color: #42b983">⚡ AI 智能检测已开启</span>
         </div>
       </div>
     </div>
 
+    <!-- 右侧控制面板 -->
     <div class="control-panel">
       <div class="panel-header">
         <div class="header-title">
@@ -117,22 +117,64 @@
         </div>
       </div>
 
-      <div class="ptz-controls">
-        <div class="d-pad">
-          <button @click="ptzCtrl('UP')" class="ptz-btn top">▲</button>
-          <div class="mid-row">
-            <button @click="ptzCtrl('LEFT')" class="ptz-btn left">◀</button>
-            <div class="center-btn">●</div>
-            <button @click="ptzCtrl('RIGHT')" class="ptz-btn right">▶</button>
+      <!-- AI 检测状态显示（无开关） -->
+      <div class="ai-section">
+        <div class="ai-header">
+          <div class="header-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="12" cy="12" r="9"/>
+              <path d="M12 8V12L15 15"/>
+            </svg>
+            <span>🤖 AI 智能检测</span>
           </div>
-          <button @click="ptzCtrl('DOWN')" class="ptz-btn bottom">▼</button>
+          <div class="ai-badge" :class="aiReady ? 'online' : 'offline'">
+            {{ aiReady ? '已就绪' : '连接中' }}
+          </div>
         </div>
 
+        <div class="ai-status">
+          <div class="ai-stats">
+            <div class="ai-stat">
+              <span class="ai-stat-label">陌生人</span>
+              <span class="ai-stat-value person-count">{{ strangerCount }} 人</span>
+            </div>
+            <div class="ai-stat">
+              <span class="ai-stat-label">摔倒</span>
+              <span class="ai-stat-value" :class="fallenDetected ? 'fall' : ''">
+                {{ fallenDetected ? '⚠️ 是' : '正常' }}
+              </span>
+            </div>
+          </div>
+          <div v-if="lastDetectTime" class="ai-time">
+            📷 最后检测: {{ lastDetectTime }}
+          </div>
+          <div v-if="showAlert" class="ai-alert">
+            ⚠️ {{ alertMessage }}
+          </div>
+          <button class="view-screenshots-btn" @click="goToScreenshots">
+            📸 查看告警截图
+          </button>
+          <button class="view-screenshots-btn" @click="goToFaceManage" style="margin-top: 8px;">
+            😀 人脸管理
+          </button>
+        </div>
+      </div>
+
+      <div class="ptz-controls">
+        <div class="d-pad">
+          <button @mousedown="startPtz('UP')" @mouseup="stopPtz" @mouseleave="stopPtz" class="ptz-btn top">▲</button>
+          <div class="mid-row">
+            <button @mousedown="startPtz('LEFT')" @mouseup="stopPtz" @mouseleave="stopPtz" class="ptz-btn left">◀</button>
+            <div class="center-btn">●</div>
+            <button @mousedown="startPtz('RIGHT')" @mouseup="stopPtz" @mouseleave="stopPtz" class="ptz-btn right">▶</button>
+          </div>
+          <button @mousedown="startPtz('DOWN')" @mouseup="stopPtz" @mouseleave="stopPtz" class="ptz-btn bottom">▼</button>
+        </div>
         <div class="control-group">
           <label>变焦控制</label>
           <div class="control-buttons">
-            <button @click="ptzCtrl('ZOOM_IN')" class="ctrl-btn">🔍 + 放大</button>
-            <button @click="ptzCtrl('ZOOM_OUT')" class="ctrl-btn">🔍 - 缩小</button>
+            <button @mousedown="startPtz('ZOOM_IN')" @mouseup="stopPtz" @mouseleave="stopPtz" class="ctrl-btn">🔍 + 放大</button>
+            <button @mousedown="startPtz('ZOOM_OUT')" @mouseup="stopPtz" @mouseleave="stopPtz" class="ctrl-btn">🔍 - 缩小</button>
           </div>
         </div>
       </div>
@@ -159,7 +201,7 @@ const devices = ref([])
 const currentDeviceName = ref('')
 let player = null
 
-// 录制相关状态
+// 录制相关
 const isRecording = ref(false)
 const recordingStatusMsg = ref('')
 const recordingStatusClass = ref('')
@@ -167,10 +209,21 @@ const currentRecordingId = ref(null)
 const currentStreamId = ref(null)
 let recordingStartTime = null
 
-// API 基础地址
-const API_BASE = 'http://' + window.location.hostname + ':8081/api/video'
+// AI 检测相关（始终开启）
+const aiReady = ref(false)
+const strangerCount = ref(0)
+const fallenDetected = ref(false)
+const lastDetectTime = ref('')
+const showAlert = ref(false)
+const alertMessage = ref('')
+let aiInterval = null
+let alertTimeout = null
 
-// 最短录制时长（秒）
+// API 地址
+const API_BASE = 'http://' + window.location.hostname + ':8081/api/video'
+const PTZ_API_BASE = 'http://' + window.location.hostname + ':8081/api/ptz'
+const PYTHON_AI_URL = 'http://localhost:5001'
+
 const MIN_RECORD_SECONDS = 10
 
 const sortedDevices = computed(() => {
@@ -199,21 +252,17 @@ const refreshRecordList = () => {
   window.dispatchEvent(new CustomEvent('refresh-records'))
 }
 
-// 开始录制
+// 录制相关函数
 const startRecording = async () => {
   if (!currentDeviceId.value) {
     showToast('请先选择设备')
     return
   }
-
   try {
     const userId = 1
     const res = await axios.post(`${API_BASE}/record/start`, null, {
       params: { deviceId: currentDeviceId.value, userId: userId }
     })
-
-    console.log('开始录制响应:', res.data)
-
     if (res.data.code === 200) {
       const data = res.data.data
       currentRecordingId.value = data.recordingId
@@ -222,8 +271,6 @@ const startRecording = async () => {
       recordingStartTime = Date.now()
       showRecordingStatus('🔴 正在录制...')
       showToast('开始录制成功')
-      console.log('保存的 recordingId:', currentRecordingId.value)
-      console.log('保存的 streamId:', currentStreamId.value)
     } else {
       showToast(res.data.msg || '开始录制失败')
     }
@@ -233,24 +280,14 @@ const startRecording = async () => {
   }
 }
 
-// 停止录制
 const stopRecording = async () => {
-  console.log('=== 停止录制被调用 ===')
-  console.log('当前 recordingId:', currentRecordingId.value)
-  console.log('当前 streamId:', currentStreamId.value)
-
   if (!currentRecordingId.value) {
     showToast('没有正在录制的任务')
     return
   }
-
-  // 计算录制时长
   const duration = (Date.now() - recordingStartTime) / 1000
-  console.log('录制时长:', duration, '秒')
-
   if (duration < MIN_RECORD_SECONDS) {
     showToast(`录制时间太短（${duration.toFixed(1)}秒），至少需要 ${MIN_RECORD_SECONDS} 秒才能保存`)
-    // 重置所有录制状态
     isRecording.value = false
     currentRecordingId.value = null
     currentStreamId.value = null
@@ -258,7 +295,6 @@ const stopRecording = async () => {
     showRecordingStatus(`❌ 录制取消（仅${duration.toFixed(1)}秒）`)
     return
   }
-
   try {
     const res = await axios.post(`${API_BASE}/record/stop`, null, {
       params: {
@@ -266,20 +302,14 @@ const stopRecording = async () => {
         streamId: currentStreamId.value
       }
     })
-
-    console.log('停止录制响应:', res.data)
-
     if (res.data.code === 200) {
-      // 无论后端返回什么，都重置前端状态
       isRecording.value = false
       currentRecordingId.value = null
       currentStreamId.value = null
       recordingStartTime = null
-
       if (res.data.data && res.data.data.filePath) {
         showRecordingStatus('✅ 录制完成，已保存')
         showToast(`录制成功！时长：${duration.toFixed(1)}秒`)
-        // 触发录像列表刷新
         refreshRecordList()
       } else {
         showRecordingStatus('⚠️ 录制完成，文件生成中')
@@ -287,7 +317,6 @@ const stopRecording = async () => {
       }
     } else {
       showToast(res.data.msg || '停止录制失败')
-      // 即使失败也重置状态，避免卡死
       isRecording.value = false
       currentRecordingId.value = null
       currentStreamId.value = null
@@ -296,7 +325,6 @@ const stopRecording = async () => {
   } catch (err) {
     console.error('停止录制失败:', err)
     showToast('停止录制失败: ' + (err.response?.data?.msg || err.message))
-    // 即使失败也重置状态，避免卡死
     isRecording.value = false
     currentRecordingId.value = null
     currentStreamId.value = null
@@ -304,7 +332,6 @@ const stopRecording = async () => {
   }
 }
 
-// 切换录制状态
 const toggleRecording = () => {
   if (isRecording.value) {
     stopRecording()
@@ -313,6 +340,126 @@ const toggleRecording = () => {
   }
 }
 
+// 检查 Python AI 服务状态
+const checkAIStatus = async () => {
+  try {
+    const res = await axios.get(`${PYTHON_AI_URL}/health`)
+    if (res.data.status === 'ok') {
+      aiReady.value = true
+      console.log('Python AI 服务已就绪')
+    } else {
+      aiReady.value = false
+    }
+  } catch (err) {
+    console.error('Python AI 服务连接失败:', err)
+    aiReady.value = false
+  }
+}
+
+// 截图并调用 Python AI 检测
+const captureAndDetect = async () => {
+  const video = videoRef.value
+  if (!video || video.paused || video.ended || video.readyState < 2) return
+
+  try {
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth || 640
+    canvas.height = video.videoHeight || 480
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+    canvas.toBlob(async (blob) => {
+      const formData = new FormData()
+      formData.append('file', blob, 'frame.jpg')
+
+      try {
+        const res = await axios.post(`${PYTHON_AI_URL}/detect`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 5000
+        })
+
+        if (res.data.code === 200 && res.data.data) {
+          const data = res.data.data
+          const hasStranger = data.has_stranger
+          const sCount = data.stranger_count || 0
+          const fallen = data.fallen
+
+          strangerCount.value = sCount
+          fallenDetected.value = fallen
+          lastDetectTime.value = new Date().toLocaleTimeString()
+
+          // 陌生人告警
+          if (hasStranger && !showAlert.value) {
+            showAlert.value = true
+            alertMessage.value = `⚠️ 检测到 ${sCount} 个陌生人！`
+            if (alertTimeout) clearTimeout(alertTimeout)
+            alertTimeout = setTimeout(() => {
+              showAlert.value = false
+            }, 5000)
+          }
+
+          // 摔倒告警
+          if (fallen && !showAlert.value) {
+            showAlert.value = true
+            alertMessage.value = `⚠️ 检测到摔倒！`
+            if (alertTimeout) clearTimeout(alertTimeout)
+            alertTimeout = setTimeout(() => {
+              showAlert.value = false
+            }, 5000)
+          }
+        }
+      } catch (err) {
+        console.error('AI 检测失败:', err)
+      }
+    }, 'image/jpeg', 0.7)
+  } catch (err) {
+    console.error('截图失败:', err)
+  }
+}
+
+// 启动 AI 检测（始终运行）
+const startAI = async () => {
+  await checkAIStatus()
+  if (aiReady.value) {
+    if (aiInterval) clearInterval(aiInterval)
+    aiInterval = setInterval(captureAndDetect, 1000)
+    console.log('AI 智能检测已启动')
+  } else {
+    console.warn('AI 服务未就绪，10秒后重试')
+    setTimeout(startAI, 10000)
+  }
+}
+
+// 跳转函数
+const goToDeviceManage = () => router.push('/devices')
+const goToScreenshots = () => router.push('/screenshots')
+const goToFaceManage = () => router.push('/face-manage')
+
+// 云台控制 - 开始转动
+const startPtz = async (direction) => {
+  if (!currentCamera.value) return
+  try {
+    await axios.post(`${PTZ_API_BASE}/control`, null, {
+      params: { deviceIp: currentCamera.value, action: direction }
+    })
+  } catch (err) {
+    console.error('云台控制失败:', err)
+  }
+}
+
+// 云台控制 - 停止转动
+const stopPtz = async () => {
+  if (!currentCamera.value) return
+  try {
+    await axios.post(`${PTZ_API_BASE}/control`, null, {
+      params: { deviceIp: currentCamera.value, action: 'STOP' }
+    })
+  } catch (err) {
+    console.error('停止云台失败:', err)
+  }
+}
+
+// 加载设备列表
 const loadDevices = async () => {
   try {
     const res = await axios.get(`${API_BASE}/devices`)
@@ -410,23 +557,25 @@ const toggleFullscreen = () => {
   const elem = document.querySelector('.player-panel')
   if (elem?.requestFullscreen) elem.requestFullscreen()
 }
-const goToDeviceManage = () => router.push('/devices')
-const ptzCtrl = (direction) => console.log('PTZ:', direction)
 
 onMounted(() => {
   loadDevices()
+  // 自动启动 AI 检测
+  startAI()
 })
 
 onUnmounted(() => {
   if (player) player.destroy()
+  if (aiInterval) clearInterval(aiInterval)
+  if (alertTimeout) clearTimeout(alertTimeout)
 })
 </script>
 
 <style scoped>
-/* 保持你原始的样式不变，添加录制按钮相关样式 */
+/* 所有原有样式保持不变，添加 AI 状态徽章样式 */
 .monitor-container { height: 100%; display: flex; gap: 16px; overflow: hidden; }
-.device-panel { width: 280px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 16px; border: 1px solid rgba(66, 185, 131, 0.2); display: flex; flex-direction: column; overflow: hidden; }
-.panel-header { padding: 16px; border-bottom: 1px solid rgba(0, 0, 0, 0.08); display: flex; justify-content: space-between; align-items: center; }
+.device-panel { width: 280px; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 16px; border: 1px solid rgba(66,185,131,0.2); display: flex; flex-direction: column; overflow: hidden; }
+.panel-header { padding: 16px; border-bottom: 1px solid rgba(0,0,0,0.08); display: flex; justify-content: space-between; align-items: center; }
 .header-title { display: flex; align-items: center; gap: 8px; font-weight: 600; color: #1a2c3e; }
 .device-count { display: flex; align-items: baseline; gap: 4px; font-size: 12px; color: #6c7a8e; }
 .count-number { font-size: 18px; font-weight: bold; color: #42b983; }
@@ -434,20 +583,20 @@ onUnmounted(() => {
 .device-list { flex: 1; padding: 12px; overflow-y: auto; }
 .device-item { display: flex; align-items: center; gap: 12px; padding: 12px; margin-bottom: 8px; background: #f8fafd; border-radius: 12px; cursor: pointer; transition: all 0.3s; border: 1px solid transparent; }
 .device-item:hover { background: #e8f4ef; transform: translateX(4px); }
-.device-item.active { background: linear-gradient(135deg, rgba(66, 185, 131, 0.1), rgba(66, 185, 131, 0.05)); border-color: #42b983; }
+.device-item.active { background: linear-gradient(135deg, rgba(66,185,131,0.1), rgba(66,185,131,0.05)); border-color: #42b983; }
 .device-status .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .status-dot.online { background: #42b983; box-shadow: 0 0 6px #42b983; }
 .status-dot.offline { background: #ef4444; }
 .device-info { flex: 1; }
 .device-name { font-weight: 600; font-size: 14px; color: #1a2c3e; }
 .device-ip { font-size: 11px; color: #6c7a8e; }
-.panel-footer { padding: 12px; border-top: 1px solid rgba(0, 0, 0, 0.08); }
+.panel-footer { padding: 12px; border-top: 1px solid rgba(0,0,0,0.08); }
 .add-device-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px; background: linear-gradient(135deg, #42b983, #2d8f64); border: none; border-radius: 10px; color: white; font-weight: 500; cursor: pointer; }
-.player-panel { flex: 1; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 16px; border: 1px solid rgba(66, 185, 131, 0.2); display: flex; flex-direction: column; overflow: hidden; }
-.video-header { padding: 12px 16px; border-bottom: 1px solid rgba(0, 0, 0, 0.08); display: flex; align-items: center; gap: 16px; }
-.live-badge { display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: rgba(239, 68, 68, 0.1); border-radius: 20px; color: #ef4444; font-size: 12px; font-weight: bold; }
+.player-panel { flex: 1; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 16px; border: 1px solid rgba(66,185,131,0.2); display: flex; flex-direction: column; overflow: hidden; }
+.video-header { padding: 12px 16px; border-bottom: 1px solid rgba(0,0,0,0.08); display: flex; align-items: center; gap: 16px; }
+.live-badge { display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: rgba(239,68,68,0.1); border-radius: 20px; color: #ef4444; font-size: 12px; font-weight: bold; }
 .live-dot { width: 8px; height: 8px; background: #ef4444; border-radius: 50%; animation: blink 1s infinite; }
-@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 .video-info { flex: 1; }
 .camera-name { font-weight: 600; font-size: 14px; }
 .resolution { font-size: 11px; color: #6c7a8e; margin-left: 8px; }
@@ -458,28 +607,47 @@ onUnmounted(() => {
 .action-btn:hover { background: #42b983; color: white; }
 .video-wrapper { flex: 1; background: #000; position: relative; }
 .video-style { width: 100%; height: 100%; object-fit: contain; }
-.video-loader { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; }
-.spinner { width: 40px; height: 40px; border: 3px solid rgba(66, 185, 131, 0.2); border-top-color: #42b983; border-radius: 50%; animation: spin 1s linear infinite; }
+.video-loader { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; }
+.spinner { width: 40px; height: 40px; border: 3px solid rgba(66,185,131,0.2); border-top-color: #42b983; border-radius: 50%; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .recording-status { position: absolute; top: 16px; right: 16px; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; animation: pulse 1.5s infinite; }
-.recording-status.status-normal { background: rgba(239, 68, 68, 0.9); color: white; }
-.recording-status.status-error { background: rgba(0, 0, 0, 0.8); color: #ffaa00; }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
-.video-footer { padding: 8px 16px; border-top: 1px solid rgba(0, 0, 0, 0.08); background: #f8fafd; }
+.recording-status.status-normal { background: rgba(239,68,68,0.9); color: white; }
+.recording-status.status-error { background: rgba(0,0,0,0.8); color: #ffaa00; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
+.video-footer { padding: 8px 16px; border-top: 1px solid rgba(0,0,0,0.08); background: #f8fafd; }
 .fps-info { display: flex; gap: 16px; font-size: 11px; color: #6c7a8e; }
-.control-panel { width: 260px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 16px; border: 1px solid rgba(66, 185, 131, 0.2); display: flex; flex-direction: column; overflow: hidden; }
+.control-panel { width: 280px; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 16px; border: 1px solid rgba(66,185,131,0.2); display: flex; flex-direction: column; overflow: hidden; }
+
+/* AI 检测样式 */
+.ai-section { padding: 16px; border-bottom: 1px solid rgba(0,0,0,0.08); }
+.ai-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.ai-badge { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; }
+.ai-badge.online { background: rgba(66,185,131,0.2); color: #42b983; }
+.ai-badge.offline { background: rgba(255,77,79,0.2); color: #ff4d4f; animation: pulse 1s infinite; }
+.ai-status { margin-top: 12px; }
+.ai-stats { display: flex; gap: 16px; margin-bottom: 8px; }
+.ai-stat { flex: 1; }
+.ai-stat-label { display: block; font-size: 10px; color: #8a99aa; margin-bottom: 4px; }
+.ai-stat-value { font-size: 20px; font-weight: bold; }
+.person-count { color: #ff4d4f; }
+.ai-stat-value.fall { color: #ff4d4f; animation: pulse 1s infinite; }
+.ai-time { font-size: 11px; color: #8a99aa; margin-bottom: 8px; }
+.ai-alert { padding: 8px 12px; background: rgba(255,77,79,0.15); border-left: 3px solid #ff4d4f; border-radius: 6px; font-size: 12px; color: #ff6b6b; margin-bottom: 10px; animation: pulse 1s infinite; }
+.view-screenshots-btn { width: 100%; padding: 8px; background: linear-gradient(135deg, #42b983, #2d8f64); border: none; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; font-size: 12px; }
+.view-screenshots-btn:hover { opacity: 0.9; }
+
 .ptz-controls { flex: 1; padding: 20px; }
 .d-pad { display: flex; flex-direction: column; align-items: center; margin-bottom: 24px; }
-.ptz-btn { width: 50px; height: 50px; background: #f0f4f9; border: 2px solid rgba(66, 185, 131, 0.3); border-radius: 12px; cursor: pointer; font-size: 20px; color: #42b983; transition: all 0.2s; }
+.ptz-btn { width: 50px; height: 50px; background: #f0f4f9; border: 2px solid rgba(66,185,131,0.3); border-radius: 12px; cursor: pointer; font-size: 20px; color: #42b983; transition: all 0.2s; }
 .ptz-btn:hover { background: #42b983; color: white; }
 .top { margin-bottom: 10px; }
 .bottom { margin-top: 10px; }
 .mid-row { display: flex; gap: 16px; align-items: center; }
-.center-btn { width: 40px; height: 40px; background: rgba(66, 185, 131, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #42b983; }
+.center-btn { width: 40px; height: 40px; background: rgba(66,185,131,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #42b983; }
 .control-group { margin-bottom: 20px; }
 .control-group label { display: block; font-size: 11px; font-weight: 600; color: #6c7a8e; margin-bottom: 8px; text-transform: uppercase; }
 .control-buttons { display: flex; gap: 10px; }
-.ctrl-btn { flex: 1; padding: 8px; background: #f0f4f9; border: 1px solid rgba(66, 185, 131, 0.3); border-radius: 8px; cursor: pointer; font-size: 11px; transition: all 0.2s; }
+.ctrl-btn { flex: 1; padding: 8px; background: #f0f4f9; border: 1px solid rgba(66,185,131,0.3); border-radius: 8px; cursor: pointer; font-size: 11px; transition: all 0.2s; }
 .ctrl-btn:hover { background: #42b983; color: white; }
 .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1a2c3e; color: white; padding: 8px 16px; border-radius: 8px; font-size: 13px; z-index: 9999; animation: fadeOut 2s ease forwards; }
 @keyframes fadeOut { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-20px); } }
