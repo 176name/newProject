@@ -87,7 +87,7 @@ public class PtzController {
     }
 
     private String buildPtzXml(String action) {
-        switch (action) {
+        switch (action) {//pan,tilt,zoom控制左右，上下，边角的速度和方向
             case "UP":
                 return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
                         "<PTZData>\n" +

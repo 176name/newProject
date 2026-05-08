@@ -18,14 +18,12 @@ spring:
 zlm:
   host: 192.168.6.138
   httpPort: 9999
-  secret: 8DCeWRJCbGXJtgRBqDn0k9sii7GrNHOR
-
 aes:
   secret-key: 1234567890123456
 
 # 千问 API 配置（可选，不配置则 AI 功能不可用）
 qwen:
-  api-key: sk-b25a64cd24264f7a82cbc23e491b915b
+
 
 test:
   message: hello
