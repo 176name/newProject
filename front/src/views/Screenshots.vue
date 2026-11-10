@@ -32,9 +32,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import axios from 'axios'
-
-const API_BASE = 'http://' + window.location.hostname + ':8081'
+import request from '../api/request.js'
 
 const images = ref([])
 const loading = ref(true)
@@ -48,7 +46,7 @@ const filteredImages = computed(() => {
 const loadScreenshots = async () => {
   loading.value = true
   try {
-    const res = await axios.get(`${API_BASE}/api/screenshots/list`)
+    const res = await request.get('/api/screenshots/list')
     if (res.data.code === 200) {
       images.value = res.data.data || []
     }

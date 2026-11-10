@@ -17,7 +17,7 @@
         </div>
         <div class="brand-text">
           <h1>HEALING STREAM</h1>
-          <p>流媒体智能管理平台</p>
+          <p>智能摄像头监控平台</p>
         </div>
         <div class="brand-features">
           <div class="feature-item">
@@ -66,6 +66,8 @@
               <input v-model="form.password" type="password" placeholder="请输入安全密码" @keyup.enter="handleLogin" />
             </div>
 
+            <div class="error-msg" v-if="errorMsg">{{ errorMsg }}</div>
+
             <div class="form-options">
               <label class="checkbox">
                 <input type="checkbox" v-model="rememberMe">
@@ -74,8 +76,8 @@
               <a href="#" class="forgot-link" @click.prevent>忘记密码？</a>
             </div>
 
-            <button class="login-btn" @click="handleLogin">
-              <span>登 录</span>
+            <button class="login-btn" @click="handleLogin" :disabled="loading">
+              <span>{{ loading ? '登录中...' : '登 录' }}</span>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                 <path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
@@ -108,6 +110,7 @@
 <script setup>
 import { reactive, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { login } from '../api/auth.js'
 
 const router = useRouter()
 const form = reactive({
@@ -115,6 +118,8 @@ const form = reactive({
   password: ''
 })
 const rememberMe = ref(false)
+const loading = ref(false)
+const errorMsg = ref('')
 
 const checkRemembered = () => {
   const savedUsername = localStorage.getItem('savedUsername')
@@ -126,22 +131,41 @@ const checkRemembered = () => {
   }
 }
 
-const handleLogin = () => {
-  if (form.username === 'admin' && form.password === '123456') {
-    localStorage.setItem('isLogin', 'true')
-    localStorage.setItem('userName', form.username)
+const handleLogin = async () => {
+  if (!form.username || !form.password) {
+    errorMsg.value = '请输入用户名和密码'
+    return
+  }
 
-    if (rememberMe.value) {
-      localStorage.setItem('savedUsername', form.username)
-      localStorage.setItem('savedPassword', form.password)
+  loading.value = true
+  errorMsg.value = ''
+
+  try {
+    const res = await login(form.username, form.password)
+    if (res.data.code === 200) {
+      const data = res.data.data
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('userName', data.username)
+      localStorage.setItem('role', data.role)
+      localStorage.setItem('isLogin', 'true')
+
+      if (rememberMe.value) {
+        localStorage.setItem('savedUsername', form.username)
+        localStorage.setItem('savedPassword', form.password)
+      } else {
+        localStorage.removeItem('savedUsername')
+        localStorage.removeItem('savedPassword')
+      }
+
+      router.push('/monitor')
     } else {
-      localStorage.removeItem('savedUsername')
-      localStorage.removeItem('savedPassword')
+      errorMsg.value = res.data.msg || '登录失败'
     }
-
-    router.push('/monitor')
-  } else {
-    alert('❌ 账号或密码错误\n\n演示账号：admin\n演示密码：123456')
+  } catch (error) {
+    errorMsg.value = '网络错误，请检查服务器连接'
+    console.error('Login error:', error)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -330,6 +354,24 @@ onMounted(() => {
   border-color: #42b983;
   background: white;
   box-shadow: 0 0 0 3px rgba(66, 185, 131, 0.1);
+}
+
+.error-msg {
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  color: #ff4d4f;
+  font-size: 13px;
+  text-align: center;
+}
+
+.login-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 .form-options {

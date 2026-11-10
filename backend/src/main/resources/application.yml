@@ -2,43 +2,56 @@ server:
   port: 8081
 
 spring:
+  profiles:
+    active: dev
   datasource:
     url: jdbc:mysql://localhost:3306/streaming_db?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
-    password: 123456ddfdfdfdf
+    password: YOUR_DATABASE_PASSWORD # 真实密码在 gitignore 的 application-dev.yml
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       auto-commit: true
       connection-timeout: 30000
       maximum-pool-size: 10
-  # WebSocket 配置（合并到这里）
-  websocket:
-    enabled: true
 
+# WebSocket 配置
+websocket:
+  enabled: true
+
+# ZLMediaKit 配置（secret 真实值在 gitignore 的 application-dev.yml）
 zlm:
-  host: 192.168.6.138
+  host: 192.168.6.145
   httpPort: 9999
+  secret: YOUR_ZLM_SECRET
+
+# AES 加密配置
 aes:
   secret-key: 1234567890123456
 
-# 千问 API 配置（可选，不配置则 AI 功能不可用）
+# 通义千问 AI API 配置（真实 Key 在 gitignore 的 application-dev.yml 中，勿提交）
 qwen:
-
+  api-key: ""
 
 test:
   message: hello
 
 # 服务器 IP
-server-ip: 192.168.6.138
+server-ip: 192.168.6.145
 
-# JWT 配置
+# JWT 鉴权配置
 jwt:
   secret: streaming-platform-secret-key-2024
   expiration: 604800000  # 7天
+
+# 24×7 全天自动录制配置（默认关闭，开启后需确保磁盘空间充足）
+recording:
+  auto:
+    enabled: false
+    retention-days: 7
 
 # AI Python 引擎配置
 ai:
   python:
     url: http://localhost:5001
   detect:
-    device-id: 1
+    device-id: 3

@@ -205,7 +205,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import axios from 'axios'
+import request from '../api/request.js'
 
 // ========== 状态 ==========
 const activeTab = ref('current')
@@ -262,7 +262,7 @@ const formatDateTime = (dateStr) => {
 // ========== 加载数据 ==========
 const loadDevices = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/devices`)
+    const res = await request.get('/api/video/devices')
     if (res.data.code === 200) {
       devices.value = res.data.data || []
       console.log('加载设备成功:', devices.value.length)
@@ -275,7 +275,7 @@ const loadDevices = async () => {
 
 const loadHistoryDevices = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/devices/history`)
+    const res = await request.get('/api/video/devices/history')
     if (res.data.code === 200) {
       historyDevices.value = res.data.data || []
       console.log('加载历史设备成功:', historyDevices.value.length)
@@ -323,12 +323,12 @@ const saveDevice = async () => {
   try {
     let res
     if (isEditing.value) {
-      res = await axios.put(`${API_BASE}/device/${form.value.id}`, form.value)
+      res = await request.put(`/api/video/device/${form.value.id}`, form.value)
       if (res.data.code === 200) {
         showToast('设备修改成功')
       }
     } else {
-      res = await axios.post(`${API_BASE}/device`, form.value)
+      res = await request.post('/api/video/device', form.value)
       if (res.data.code === 200) {
         showToast('设备添加成功')
       }
@@ -352,7 +352,7 @@ const deleteDevice = async (id, name) => {
   if (!confirm(`确定要删除设备"${name}"吗？删除后将移到历史记录`)) return
 
   try {
-    const res = await axios.delete(`${API_BASE}/device/${id}`)
+    const res = await request.delete(`/api/video/device/${id}`)
     if (res.data.code === 200) {
       showToast('设备已移至历史记录')
       await loadDevices()
@@ -368,7 +368,7 @@ const deleteDevice = async (id, name) => {
 
 const restoreDevice = async (id, name) => {
   try {
-    const res = await axios.post(`${API_BASE}/device/${id}/restore`)
+    const res = await request.post(`/api/video/device/${id}/restore`)
     if (res.data.code === 200) {
       showToast(`设备"${name}"恢复成功`)
       await loadDevices()
@@ -386,7 +386,7 @@ const permanentDelete = async (id, name) => {
   if (!confirm(`彻底删除"${name}"后无法恢复，确定吗？`)) return
 
   try {
-    const res = await axios.delete(`${API_BASE}/device/${id}/permanent`)
+    const res = await request.delete(`/api/video/device/${id}/permanent`)
     if (res.data.code === 200) {
       showToast('设备已彻底删除')
       await loadHistoryDevices()

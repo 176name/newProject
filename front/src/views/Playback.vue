@@ -162,7 +162,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import axios from 'axios'
+import request from '../api/request.js'
 
 // ========== 状态 ==========
 const activeTab = ref('auto')
@@ -188,9 +188,7 @@ const showDeleteModal = ref(false)
 const deleteRecordId = ref(null)
 const deleteRecordName = ref('')
 const toastMsg = ref('')
-
-// API 基础地址
-const API_BASE = `http://${window.location.hostname}:8081/api`
+const serverIp = ref('')
 
 // ========== 工具方法 ==========
 const showToast = (msg) => {
@@ -201,8 +199,13 @@ const showToast = (msg) => {
 const formatDateTime = (dateStr) => {
   if (!dateStr) return '-'
   try {
-    const date = new Date(dateStr)
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`
+    // 手动解析避免浏览器时区歧义（后端返回的是本地时间，无时区标记）
+    const parts = dateStr.split('T')
+    const d = parts[0].split('-')
+    const t = (parts[1] || '00:00:00').split(':')
+    const y = parseInt(d[0]), m = parseInt(d[1]) - 1, day = parseInt(d[2])
+    const h = parseInt(t[0]), min = parseInt(t[1]), sec = parseInt((t[2] || '0').split('.')[0])
+    return `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')} ${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
   } catch {
     return dateStr
   }
@@ -229,7 +232,7 @@ const formatFileSize = (bytes) => {
 // ========== 数据加载 ==========
 const loadDevices = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/playback/devices`)
+    const res = await request.get('/api/playback/devices')
     if (res.data.code === 200) {
       devices.value = res.data.data || []
     }
@@ -249,8 +252,10 @@ const searchRecords = async () => {
       page: currentPage.value,
       pageSize: pageSize.value
     }
+    if (startDate.value) params.startDate = startDate.value
+    if (endDate.value) params.endDate = endDate.value
 
-    const res = await axios.get(`${API_BASE}/video/record/history/byType`, { params })
+    const res = await request.get('/api/video/record/history/byType', { params })
 
     if (res.data.code === 200) {
       const data = res.data.data
@@ -291,8 +296,10 @@ const goToPage = async (page) => {
       page: currentPage.value,
       pageSize: pageSize.value
     }
+    if (startDate.value) params.startDate = startDate.value
+    if (endDate.value) params.endDate = endDate.value
 
-    const res = await axios.get(`${API_BASE}/video/record/history/byType`, { params })
+    const res = await request.get('/api/video/record/history/byType', { params })
 
     if (res.data.code === 200) {
       records.value = res.data.data.list || []
@@ -316,11 +323,12 @@ const refreshData = () => {
 const selectRecord = async (record) => {
   currentRecord.value = record
 
-  if (record.file_path) {
-    // 写死 Linux 服务器 IP
+  if (record.file_path && serverIp.value) {
     let relativePath = record.file_path.replace('/opt/media/bin/www/record/', '')
-    videoUrl.value = `http://192.168.6.138:8888/record/${relativePath}`
+    videoUrl.value = `http://${serverIp.value}:8888/record/${relativePath}`
     console.log('播放地址:', videoUrl.value)
+  } else if (record.file_path) {
+    showToast('正在获取服务器信息...')
   } else {
     videoUrl.value = ''
     showToast('该录像没有文件路径')
@@ -340,7 +348,7 @@ const deleteRecord = (id, name) => {
 
 const confirmDelete = async () => {
   try {
-    const res = await axios.delete(`${API_BASE}/video/record/${deleteRecordId.value}`)
+    const res = await request.delete(`/api/video/record/${deleteRecordId.value}`)
     if (res.data.code === 200) {
       showToast('删除成功')
       await searchRecords()
@@ -366,7 +374,20 @@ const closeDeleteModal = () => {
 }
 
 // ========== 生命周期 ==========
-onMounted(() => {
+const fetchServerIp = async () => {
+  try {
+    const res = await request.get('/api/playback/system/ip')
+    if (res.data.code === 200) {
+      serverIp.value = res.data.data
+    }
+  } catch (err) {
+    console.error('获取服务器IP失败:', err)
+    serverIp.value = '192.168.6.145' // fallback
+  }
+}
+
+onMounted(async () => {
+  await fetchServerIp()
   loadDevices()
   searchRecords()
 })

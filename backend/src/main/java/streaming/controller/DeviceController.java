@@ -5,6 +5,7 @@ import cn.hutool.http.HttpResponse;
 import com.alibaba.fastjson2.JSON;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 import streaming.domain.Result;
@@ -36,8 +37,13 @@ public class DeviceController {
     @Autowired
     private StreamServiceImpl streamService;
 
+    @Value("${recording.auto.enabled:false}")
+    private boolean autoRecordingEnabled;
+
     // 缓存设备在线状态
     private static final ConcurrentHashMap<String, Boolean> deviceStatusCache = new ConcurrentHashMap<>();
+    // 录制开始前的文件快照，key=historyId, value=文件列表（用于stop时精确匹配新文件）
+    private static final ConcurrentHashMap<Long, java.util.Set<String>> recordingFileSnapshots = new ConcurrentHashMap<>();
     private static long recordingIdCounter = System.currentTimeMillis();
 
     /**
@@ -377,13 +383,30 @@ public class DeviceController {
                 return Result.error("设备不存在");
             }
 
-            // 自动插入数据库
-            Long recordingId = System.currentTimeMillis();
-            String sql = "INSERT INTO recording_history (recording_id, device_id, user_id, action, status, start_time, end_time, duration_seconds, file_path, file_size, record_type, created_at) " +
-                    "VALUES (?, ?, 1, 'stop', 'success', NOW() - INTERVAL ? SECOND, NOW(), ?, ?, ?, 'manual', NOW())";
-            jdbcTemplate.update(sql, recordingId, deviceId, duration, duration, filePath, fileSize);
+            // 检查是否已有相同 file_path 的记录（手动录制 stop 流程可能已写入）
+            String checkSql = "SELECT COUNT(*) FROM recording_history WHERE file_path = ?";
+            Integer existingCount = jdbcTemplate.queryForObject(checkSql, Integer.class, filePath);
+            if (existingCount != null && existingCount > 0) {
+                log.info("记录已存在(file_path), 跳过回调插入: {}", filePath);
+                return Result.success("ok");
+            }
 
-            log.info("自动入库成功: recordingId={}, filePath={}, duration={}秒", recordingId, filePath, duration);
+            // 查找该设备最近一条没有 file_path 的记录（可能是 running/recording/success），更新而非插入
+            String findSql = "SELECT id FROM recording_history WHERE device_id = ? AND (file_path IS NULL OR file_path = '') ORDER BY created_at DESC LIMIT 1";
+            List<Map<String, Object>> pendingRecords = jdbcTemplate.queryForList(findSql, deviceId);
+            String recordType = autoRecordingEnabled ? "auto" : "manual";
+
+            if (!pendingRecords.isEmpty()) {
+                Long historyId = ((Number) pendingRecords.get(0).get("id")).longValue();
+                String updateSql = "UPDATE recording_history SET end_time = NOW(), duration_seconds = ?, file_path = ?, file_size = ?, status = 'success', record_type = ?, recording_id = ? WHERE id = ?";
+                jdbcTemplate.update(updateSql, duration, filePath, fileSize, recordType, System.currentTimeMillis(), historyId);
+                log.info("回调更新已存在记录: historyId={}, filePath={}, duration={}秒", historyId, filePath, duration);
+            } else {
+                String sql = "INSERT INTO recording_history (recording_id, device_id, user_id, action, status, start_time, end_time, duration_seconds, file_path, file_size, record_type, created_at) " +
+                        "VALUES (?, ?, 1, 'stop', 'success', NOW() - INTERVAL ? SECOND, NOW(), ?, ?, ?, ?, NOW())";
+                jdbcTemplate.update(sql, System.currentTimeMillis(), deviceId, duration, duration, filePath, fileSize, recordType);
+                log.info("回调新建记录: filePath={}, duration={}秒", filePath, duration);
+            }
 
             return Result.success("ok");
         } catch (Exception e) {
@@ -402,8 +425,7 @@ public class DeviceController {
                               @RequestParam(defaultValue = "1") Integer userId) {
         try {
             // ========== 强制清理该设备的旧录制状态 ==========
-            // 清理数据库中卡住的 running 状态
-            String cleanSql = "UPDATE recording_history SET status = 'failed', end_time = NOW(), error_message = '被新录制覆盖' WHERE device_id = ? AND status = 'running'";
+            String cleanSql = "UPDATE recording_history SET status = 'failed', end_time = NOW(), error_message = '被新录制覆盖' WHERE device_id = ? AND status IN ('running','recording')";
             int cleaned = jdbcTemplate.update(cleanSql, deviceId);
             if (cleaned > 0) {
                 log.info("清理了 {} 条卡住的录制状态，设备ID: {}", cleaned, deviceId);
@@ -440,6 +462,17 @@ public class DeviceController {
                 if (deviceIp != null) {
                     streamId = "camera_" + deviceIp.replace(".", "_");
                 }
+            }
+
+            // 快照：记录录制开始前的文件列表，用于 stop 时精确匹配新文件
+            java.util.Set<String> beforeFiles = streamService.getTodayRecordFiles(streamId);
+            recordingFileSnapshots.put(historyId, beforeFiles);
+            log.info("录制前文件快照: historyId={}, streamId={}, 已有 {} 个文件: {}", historyId, streamId, beforeFiles.size(), beforeFiles);
+
+            // 调用 ZLM 开始MP4录制
+            Result recordResult = streamService.startMp4Recording(streamId, historyId);
+            if (recordResult.getCode() != 200) {
+                log.warn("ZLM开始录制返回非成功状态: {}", recordResult.getMsg());
             }
 
             Map<String, Object> data = new HashMap<>();
@@ -486,8 +519,11 @@ public class DeviceController {
                 return Result.error("无法获取流ID，请检查录制记录");
             }
 
-            // 调用 StreamService 停止推流并获取录制文件
-            Result stopResult = streamService.stopPush(streamId, recordingId, recordType);
+            // 获取录制前的文件快照，用于精确匹配新文件
+            java.util.Set<String> beforeFiles = recordingFileSnapshots.remove(recordingId);
+
+            // 调用 StreamService 停止MP4录制并获取文件
+            Result stopResult = streamService.stopMp4Recording(streamId, recordingId, beforeFiles);
 
             log.info("停止录制结果: {}", stopResult);
             return stopResult;
@@ -570,19 +606,52 @@ public class DeviceController {
     public Result getHistoryByType(@RequestParam Integer deviceId,
                                    @RequestParam String recordType,
                                    @RequestParam(defaultValue = "1") int page,
-                                   @RequestParam(defaultValue = "20") int pageSize) {
+                                   @RequestParam(defaultValue = "20") int pageSize,
+                                   @RequestParam(required = false) String startDate,
+                                   @RequestParam(required = false) String endDate) {
         try {
             int offset = (page - 1) * pageSize;
+            boolean filterByDevice = deviceId != null && deviceId > 0;
+            boolean filterByStartDate = startDate != null && !startDate.isEmpty();
+            boolean filterByEndDate = endDate != null && !endDate.isEmpty();
+
+            StringBuilder whereClause = new StringBuilder(" WHERE h.status = 'success' AND h.record_type = ? ");
+            java.util.List<Object> params = new java.util.ArrayList<>();
+            java.util.List<Object> countParams = new java.util.ArrayList<>();
+
+            // recordType param
+            params.add(recordType);
+            countParams.add(recordType);
+
+            if (filterByDevice) {
+                whereClause.append(" AND h.device_id = ? ");
+                params.add(deviceId);
+                countParams.add(deviceId);
+            }
+            if (filterByStartDate) {
+                whereClause.append(" AND h.start_time >= ? ");
+                params.add(startDate + " 00:00:00");
+                countParams.add(startDate + " 00:00:00");
+            }
+            if (filterByEndDate) {
+                whereClause.append(" AND h.start_time <= ? ");
+                params.add(endDate + " 23:59:59");
+                countParams.add(endDate + " 23:59:59");
+            }
+
             String sql = "SELECT h.*, d.name as device_name " +
                     "FROM recording_history h " +
                     "LEFT JOIN device d ON h.device_id = d.id " +
-                    "WHERE h.device_id = ? AND h.record_type = ? AND h.status = 'success' " +
+                    whereClause.toString() +
                     "ORDER BY h.created_at DESC " +
                     "LIMIT ? OFFSET ?";
-            String countSql = "SELECT COUNT(*) FROM recording_history WHERE device_id = ? AND record_type = ? AND status = 'success'";
+            String countSql = "SELECT COUNT(*) FROM recording_history h " + whereClause.toString();
 
-            List<Map<String, Object>> list = jdbcTemplate.queryForList(sql, deviceId, recordType, pageSize, offset);
-            Integer total = jdbcTemplate.queryForObject(countSql, Integer.class, deviceId, recordType);
+            params.add(pageSize);
+            params.add(offset);
+
+            List<Map<String, Object>> list = jdbcTemplate.queryForList(sql, params.toArray());
+            Integer total = jdbcTemplate.queryForObject(countSql, Integer.class, countParams.toArray());
 
             Map<String, Object> data = new HashMap<>();
             data.put("list", list);

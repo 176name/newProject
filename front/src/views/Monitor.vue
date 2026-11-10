@@ -189,6 +189,7 @@ import { onMounted, onUnmounted, ref, nextTick, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import mpegts from 'mpegts.js'
 import axios from 'axios'
+import request from '../api/request.js'
 
 const router = useRouter()
 const loading = ref(true)
@@ -219,9 +220,7 @@ const alertMessage = ref('')
 let aiInterval = null
 let alertTimeout = null
 
-// API 地址
-const API_BASE = 'http://' + window.location.hostname + ':8081/api/video'
-const PTZ_API_BASE = 'http://' + window.location.hostname + ':8081/api/ptz'
+// Python AI 地址（不需要 JWT）
 const PYTHON_AI_URL = 'http://localhost:5001'
 
 const MIN_RECORD_SECONDS = 10
@@ -260,12 +259,12 @@ const startRecording = async () => {
   }
   try {
     const userId = 1
-    const res = await axios.post(`${API_BASE}/record/start`, null, {
+    const res = await request.post('/api/video/record/start', null, {
       params: { deviceId: currentDeviceId.value, userId: userId }
     })
     if (res.data.code === 200) {
       const data = res.data.data
-      currentRecordingId.value = data.recordingId
+      currentRecordingId.value = data.historyId
       currentStreamId.value = data.streamId
       isRecording.value = true
       recordingStartTime = Date.now()
@@ -286,27 +285,27 @@ const stopRecording = async () => {
     return
   }
   const duration = (Date.now() - recordingStartTime) / 1000
-  if (duration < MIN_RECORD_SECONDS) {
-    showToast(`录制时间太短（${duration.toFixed(1)}秒），至少需要 ${MIN_RECORD_SECONDS} 秒才能保存`)
-    isRecording.value = false
-    currentRecordingId.value = null
-    currentStreamId.value = null
-    recordingStartTime = null
-    showRecordingStatus(`❌ 录制取消（仅${duration.toFixed(1)}秒）`)
-    return
-  }
+  const tooShort = duration < MIN_RECORD_SECONDS
+
   try {
-    const res = await axios.post(`${API_BASE}/record/stop`, null, {
+    const res = await request.post('/api/video/record/stop', null, {
       params: {
         recordingId: currentRecordingId.value,
         streamId: currentStreamId.value
       }
     })
+    isRecording.value = false
+    currentRecordingId.value = null
+    currentStreamId.value = null
+    recordingStartTime = null
+
+    if (tooShort) {
+      showRecordingStatus(`❌ 录制取消（仅${duration.toFixed(1)}秒）`)
+      showToast(`录制时间太短（${duration.toFixed(1)}秒），至少需要 ${MIN_RECORD_SECONDS} 秒才能保存`)
+      return
+    }
+
     if (res.data.code === 200) {
-      isRecording.value = false
-      currentRecordingId.value = null
-      currentStreamId.value = null
-      recordingStartTime = null
       if (res.data.data && res.data.data.filePath) {
         showRecordingStatus('✅ 录制完成，已保存')
         showToast(`录制成功！时长：${duration.toFixed(1)}秒`)
@@ -317,10 +316,6 @@ const stopRecording = async () => {
       }
     } else {
       showToast(res.data.msg || '停止录制失败')
-      isRecording.value = false
-      currentRecordingId.value = null
-      currentStreamId.value = null
-      recordingStartTime = null
     }
   } catch (err) {
     console.error('停止录制失败:', err)
@@ -439,7 +434,7 @@ const goToFaceManage = () => router.push('/face-manage')
 const startPtz = async (direction) => {
   if (!currentCamera.value) return
   try {
-    await axios.post(`${PTZ_API_BASE}/control`, null, {
+    await request.post('/api/ptz/control', null, {
       params: { deviceIp: currentCamera.value, action: direction }
     })
   } catch (err) {
@@ -451,7 +446,7 @@ const startPtz = async (direction) => {
 const stopPtz = async () => {
   if (!currentCamera.value) return
   try {
-    await axios.post(`${PTZ_API_BASE}/control`, null, {
+    await request.post('/api/ptz/control', null, {
       params: { deviceIp: currentCamera.value, action: 'STOP' }
     })
   } catch (err) {
@@ -462,7 +457,7 @@ const stopPtz = async () => {
 // 加载设备列表
 const loadDevices = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/devices`)
+    const res = await request.get('/api/video/devices')
     if (res.data.code === 200) {
       devices.value = res.data.data || []
       if (devices.value.length > 0 && !currentCamera.value) {
@@ -487,7 +482,7 @@ const initMonitor = async () => {
   loading.value = true
 
   try {
-    const res = await axios.get(`${API_BASE}/play`, { params: { cameraIp: currentCamera.value } })
+    const res = await request.get('/api/video/play', { params: { cameraIp: currentCamera.value } })
     if (res.data.code === 200) {
       let finalUrl = res.data.data
       console.log('后端返回原始地址:', finalUrl)

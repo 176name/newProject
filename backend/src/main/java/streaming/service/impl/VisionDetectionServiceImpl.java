@@ -37,6 +37,9 @@ public class VisionDetectionServiceImpl implements IVisionDetectionService {
     @Autowired
     private DeviceMapper deviceMapper;
 
+    @Autowired
+    private streaming.config.ZlmConfig zlmConfig;
+
     private CascadeClassifier detector;
     private boolean ready = false;
     private String status = "未初始化";
@@ -140,11 +143,22 @@ public class VisionDetectionServiceImpl implements IVisionDetectionService {
             return null;
         }
 
-        // 构建 RTSP 地址
-        // 注意：如果密码是 AES 加密的，需要先解密
-        String password = device.getPassword();
-        String rtspUrl = String.format("rtsp://%s:%s@%s:554/Streaming/Channels/%d",
-                device.getUsername(), password, device.getIp(), device.getChannel());
+        // 构建 RTSP 地址（与 StreamServiceImpl 的三种模式保持一致）
+        String sourceUrl = device.getRtspUrl();
+        String rtspUrl;
+        if (sourceUrl != null && sourceUrl.startsWith("push://")) {
+            // 模式1：外部推流 → 从 ZLM 的输出流抓帧
+            String pushStream = sourceUrl.substring(7);
+            rtspUrl = String.format("rtsp://%s:554/%s", zlmConfig.getHost(), pushStream);
+        } else if (sourceUrl != null && !sourceUrl.isEmpty()) {
+            // 模式2：自定义拉流地址
+            rtspUrl = sourceUrl;
+        } else {
+            // 模式3：海康默认格式（密码如为 AES 加密，此处需先解密）
+            String password = device.getPassword();
+            rtspUrl = String.format("rtsp://%s:%s@%s:554/Streaming/Channels/%d",
+                    device.getUsername(), password, device.getIp(), device.getChannel());
+        }
 
         log.debug("抓帧 RTSP: {}", rtspUrl.replaceAll(":[^:]*@", ":***@")); // 隐藏密码
 

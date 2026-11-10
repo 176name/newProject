@@ -81,7 +81,7 @@ const route = useRoute()
 const userName = ref('管理员')
 const dropdownOpen = ref(false)
 const dropdownRef = ref(null)
-const isAdmin = ref(true)
+const isAdmin = ref(localStorage.getItem('role') === 'ADMIN')
 
 const isFullPageRoute = computed(() => {
   const fullPageRoutes = ['/user-center', '/users']
@@ -122,8 +122,10 @@ const goToUserManage = () => {
 
 const handleLogout = () => {
   dropdownOpen.value = false
+  localStorage.removeItem('token')
   localStorage.removeItem('isLogin')
   localStorage.removeItem('userName')
+  localStorage.removeItem('role')
   router.push('/login')
 }
 </script>

@@ -21,4 +21,5 @@ public class Device {
     private LocalDateTime lastOnlineTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+    private LocalDateTime deletedAt;
 }

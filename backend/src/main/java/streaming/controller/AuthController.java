@@ -1,5 +1,6 @@
 package streaming.controller;
 
+import cn.hutool.crypto.digest.BCrypt;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -28,17 +29,6 @@ public class AuthController {
             String username = request.getUsername();
             String password = request.getPassword();
 
-            // 管理员硬编码验证
-            if ("admin".equals(username) && "123456".equals(password)) {
-                String token = jwtUtil.generateToken(1L, "admin", "ADMIN");
-                Map<String, Object> data = new HashMap<>();
-                data.put("token", token);
-                data.put("username", "admin");
-                data.put("role", "ADMIN");
-                return Result.success(data, "登录成功");
-            }
-
-            // 普通用户从数据库验证
             String sql = "SELECT id, username, password, role FROM user WHERE username = ?";
             List<Map<String, Object>> users = jdbcTemplate.queryForList(sql, username);
 
@@ -49,8 +39,7 @@ public class AuthController {
             Map<String, Object> user = users.get(0);
             String storedPassword = (String) user.get("password");
 
-            // 明文密码验证（不使用 BCrypt）
-            if (!password.equals(storedPassword)) {
+            if (!BCrypt.checkpw(password, storedPassword)) {
                 return Result.error("用户名或密码错误");
             }
 
@@ -58,9 +47,6 @@ public class AuthController {
             String role = (String) user.get("role");
 
             String token = jwtUtil.generateToken(userId, username, role);
-
-            // 更新最后登录时间
-            jdbcTemplate.update("UPDATE user SET last_login_time = NOW() WHERE id = ?", userId);
 
             Map<String, Object> data = new HashMap<>();
             data.put("token", token);

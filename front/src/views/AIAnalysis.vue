@@ -134,6 +134,11 @@
         </div>
         <div class="report-content">
           <div v-if="analyzing" class="loading-state"><div class="loading-spinner"></div><p>AI 正在分析流量数据，请稍候...</p></div>
+          <div v-else-if="analysisError" class="error-state">
+            <span>❌</span>
+            <p>AI分析失败</p>
+            <p class="error-detail">{{ analysisError }}</p>
+          </div>
           <div v-else-if="analysisResult" class="report-result">
             <div class="report-section"><div class="section-title">【整体流量评估】</div><div class="section-text">{{ analysisResult.overview }}</div></div>
             <div class="report-section"><div class="section-title">【高流量摄像头分析】</div><div class="section-text">{{ analysisResult.highTraffic }}</div></div>
@@ -209,11 +214,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import * as echarts from 'echarts'
-import axios from 'axios'
-
-// ========== 配置 ==========
-// 写死 Linux 服务器 IP
-const API_BASE = 'http://192.168.6.138:8081/api'
+import request from '../api/request.js'
 
 // ========== 数据状态 ==========
 const analyzing = ref(false)
@@ -259,6 +260,7 @@ const p95Bandwidth = ref('0')
 const analysisResult = ref(null)
 const suggestions = ref([])
 const alertMsg = ref('')
+const analysisError = ref('')
 const historyList = ref([])
 
 // ECharts 实例
@@ -313,7 +315,7 @@ const selectSingleDevice = (id) => {
 // 加载设备列表
 const loadDevices = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/video/devices`)
+    const res = await request.get('/api/video/devices')
     if (res.data.code === 200) {
       const devices = res.data.data || []
       cameraList.value = devices.map(device => ({
@@ -338,7 +340,7 @@ const loadDevices = async () => {
 // 加载流量排名数据
 const loadTrafficData = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/traffic/ranking?period=day`)
+    const res = await request.get('/api/traffic/ranking', { params: { period: 'day' } })
     if (res.data.code === 200) {
       const rankings = res.data.data || []
 
@@ -369,7 +371,7 @@ const loadTrafficData = async () => {
 // 加载实时码率（从 ZLM 获取）
 const loadRealTimeBitrate = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/traffic/realtime`)
+    const res = await request.get('/api/traffic/realtime')
     if (res.data.code === 200) {
       const streams = res.data.data?.streams || []
 
@@ -391,7 +393,7 @@ const loadRealTimeBitrate = async () => {
 // 加载流量趋势
 const loadTrafficTrend = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/traffic/trend?days=7`)
+    const res = await request.get('/api/traffic/trend', { params: { days: 7 } })
     if (res.data.code === 200) {
       const trend = res.data.data || []
       const times = []
@@ -510,6 +512,7 @@ const runAnalysis = async () => {
   analysisResult.value = null
   suggestions.value = []
   alertMsg.value = ''
+  analysisError.value = ''
 
   try {
     const trendData = trafficData24h.value.times.map((time, idx) => ({
@@ -543,7 +546,7 @@ const runAnalysis = async () => {
       trafficTrend: trendData
     }
 
-    const res = await axios.post(`${API_BASE}/ai/analyze-traffic`, requestData)
+    const res = await request.post('/api/ai/analyze-traffic', requestData)
 
     if (res.data.code === 200) {
       const data = res.data.data
@@ -556,43 +559,16 @@ const runAnalysis = async () => {
       alertMsg.value = data.alert || ''
       showToast('AI分析完成')
     } else {
-      useMockData()
+      analysisError.value = res.data.msg || 'AI分析返回错误'
+      showToast('AI分析失败')
     }
   } catch (err) {
     console.error('AI分析失败:', err)
-    useMockData()
+    const errMsg = err.response?.data?.msg || err.message || '网络请求失败'
+    analysisError.value = errMsg
+    showToast('AI分析失败: ' + errMsg)
   } finally {
     analyzing.value = false
-  }
-}
-
-const useMockData = () => {
-  if (selectedDevice.value === 'all') {
-    const total = currentStats.value.totalTraffic
-    const topCamera = cameraList.value[0]
-    analysisResult.value = {
-      overview: `今日总流量${total}GB。${topCamera?.name || ''}流量最高，占总流量${topCamera?.percent || 0}%。`,
-      highTraffic: `${topCamera?.name || ''}流量${topCamera?.traffic || 0}GB，占比${topCamera?.percent || 0}%。`,
-      bitrateAnalysis: `${topCamera?.name || ''}码率${topCamera?.bitrate || 0}kbps，${topCamera?.bitrate > 3000 ? '偏高，建议优化' : '正常'}。`
-    }
-    suggestions.value = [
-      '建议降低高流量摄像头码率，预计每月可节省流量费用',
-      '夜间时段流量较低，可考虑自动降码率',
-      '定期检查设备运行状态'
-    ]
-    alertMsg.value = cameraList.value.some(c => c.bitrate > 3000) ? '部分摄像头码率偏高，请关注' : ''
-  } else {
-    const cam = selectedCamera.value
-    analysisResult.value = {
-      overview: `${cam?.name}今日流量${cam?.traffic || 0}GB，费用${cam?.cost || 0}元。`,
-      highTraffic: `${cam?.name}流量${cam?.traffic || 0}GB。`,
-      bitrateAnalysis: `当前码率${cam?.bitrate || 0}kbps，${cam?.bitrate > 3000 ? '建议优化' : '设置合理'}。`
-    }
-    suggestions.value = [
-      cam?.bitrate > 3000 ? `建议将${cam?.name}码率降低` : '当前码率设置合理',
-      '建议开启夜间自动降码率策略'
-    ]
-    alertMsg.value = cam?.bitrate > 3000 ? `${cam?.name}码率偏高，建议优化` : ''
   }
 }
 
@@ -712,6 +688,9 @@ onUnmounted(() => {
 .section-text { color: #4a5a6e; line-height: 1.6; font-size: 14px; padding-left: 12px; }
 .report-placeholder, .suggest-placeholder { text-align: center; padding: 60px 20px; color: #6c7a8e; }
 .report-placeholder span, .suggest-placeholder span { font-size: 48px; display: block; margin-bottom: 16px; }
+.error-state { text-align: center; padding: 40px 20px; color: #ef4444; }
+.error-state span { font-size: 48px; display: block; margin-bottom: 12px; }
+.error-detail { font-size: 12px; color: #94a3b8; margin-top: 8px; word-break: break-all; }
 .loading-state { text-align: center; padding: 60px 20px; }
 .loading-spinner { width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top-color: #8b5cf6; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px; }
 .loading-spinner-small { width: 24px; height: 24px; border: 2px solid #e2e8f0; border-top-color: #8b5cf6; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 12px; }

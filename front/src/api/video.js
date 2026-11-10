@@ -1,10 +1,5 @@
 // src/api/video.js
-import axios from 'axios';
-
-// 写死 Linux 服务器 IP
-const request = axios.create({
-    baseURL: 'http://192.168.6.138:8081'
-});
+import request from './request';
 
 // ========== 设备管理 API ==========
 export const getPlayUrl = (cameraIp) => {
@@ -36,8 +31,16 @@ export const getRealtimeBandwidth = async () => {
         console.log('实时带宽返回:', res.data);
 
         if (res.data.code === 200 && res.data.data) {
-            const totalMbps = parseFloat(res.data.data.totalBandwidthMbps) || 0;
-            const halfMbps = totalMbps / 2;
+            const data = res.data.data;
+            const totalMbps = parseFloat(data.totalBandwidthMbps) || 0;
+            const streams = (data.streams || []).map(s => ({
+                stream: s.stream,
+                bytesSpeed: s.bytesSpeed || 0,
+                bitrate: s.bitrate || 0,
+                readerCount: s.readerCount || 0,
+                totalBytes: s.totalBytes || 0,
+                aliveSecond: s.aliveSecond || 0
+            }));
 
             return {
                 code: 200,
@@ -45,8 +48,11 @@ export const getRealtimeBandwidth = async () => {
                 data: {
                     currentBandwidth: totalMbps.toFixed(1),
                     bandwidthChange: '0',
-                    uploadBandwidth: halfMbps.toFixed(1),
-                    downloadBandwidth: halfMbps.toFixed(1)
+                    // 摄像头是单向推流，上下行共用总带宽
+                    uploadBandwidth: totalMbps.toFixed(1),
+                    downloadBandwidth: '0',
+                    streamCount: data.streamCount || streams.length,
+                    streams: streams
                 }
             };
         }
@@ -58,7 +64,9 @@ export const getRealtimeBandwidth = async () => {
                 currentBandwidth: '0',
                 bandwidthChange: '0',
                 uploadBandwidth: '0',
-                downloadBandwidth: '0'
+                downloadBandwidth: '0',
+                streamCount: 0,
+                streams: []
             }
         };
     } catch (error) {
@@ -70,7 +78,9 @@ export const getRealtimeBandwidth = async () => {
                 currentBandwidth: '0',
                 bandwidthChange: '0',
                 uploadBandwidth: '0',
-                downloadBandwidth: '0'
+                downloadBandwidth: '0',
+                streamCount: 0,
+                streams: []
             }
         };
     }

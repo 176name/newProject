@@ -28,3 +28,6 @@ Thumbs.db
 *.flv
 *.hls
 recordings/
+sql/backup_*.sql
+*.xltd
+*.xltd.cfg

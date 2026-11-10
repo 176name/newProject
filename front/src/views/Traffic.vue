@@ -20,7 +20,7 @@
           <span class="live-dot"></span>
           <span>实时更新</span>
           <span class="update-time">{{ lastUpdateTime }}</span>
-          <span class="device-stats">设备总数: {{ totalDeviceCount }}</span>
+          <span class="device-stats">活跃流: {{ streamData.length }} | 设备: {{ deviceList.length }}</span>
         </div>
       </div>
     </div>
@@ -166,7 +166,9 @@
           <div class="rank-bar">
             <div class="rank-fill" :style="{ width: item.percent + '%' }"></div>
           </div>
-          <div class="rank-value">{{ item.traffic }} GB</div>
+          <div class="rank-value">
+            {{ parseFloat(item.traffic) > 0 ? item.traffic + ' GB' : (item.bitrate ? item.bitrate + ' kbps' : '0 GB') }}
+          </div>
           <button
               class="limit-btn"
               :disabled="limitingDeviceId === item.id || !item.online"
@@ -245,6 +247,9 @@ const maxBandwidth = ref('50')
 const totalTraffic = ref('0')
 const trafficRank = ref([])
 
+// ZLM实时流数据
+const streamData = ref([])
+
 // 图表数据
 const timeLabels = ref([])
 const incomingData = ref([])
@@ -300,6 +305,7 @@ const fetchRealtimeBandwidth = async () => {
       bandwidthChange.value = String(res.data.bandwidthChange || '0')
       uploadBandwidth.value = String(res.data.uploadBandwidth || '0')
       downloadBandwidth.value = String(res.data.downloadBandwidth || '0')
+      streamData.value = res.data.streams || []
       lastUpdateTime.value = new Date().toLocaleTimeString()
     }
   } catch (error) {
@@ -350,7 +356,38 @@ const fetchDeviceRank = async () => {
     }
 
     if (res && res.data) {
-      trafficRank.value = res.data.rankList || []
+      let rankList = res.data.rankList || []
+
+      // 如果录制历史无当天数据，使用ZLM实时流数据作为fallback
+      const hasRealTraffic = rankList.some(item => parseFloat(item.traffic) > 0)
+      if (!hasRealTraffic && streamData.value.length > 0) {
+        rankList = deviceList.value
+          .filter(device => {
+            const streamId = device.stream_id || ('camera_' + (device.ip || '').replace(/\./g, '_'))
+            return streamData.value.some(s => s.stream === streamId)
+          })
+          .map(device => {
+            const streamId = device.stream_id || ('camera_' + (device.ip || '').replace(/\./g, '_'))
+            const stream = streamData.value.find(s => s.stream === streamId)
+            return {
+              id: device.id,
+              name: device.name || '未知设备',
+              ip: device.ip || '',
+              traffic: '0', // 录制流量为0
+              bitrate: stream ? stream.bitrate : 0,
+              percent: 0,
+              online: true
+            }
+          })
+
+        // 对实时流数据计算百分比
+        const maxBitrate = Math.max(...rankList.map(r => r.bitrate || 0), 1)
+        rankList.forEach(item => {
+          item.percent = Math.round((item.bitrate / maxBitrate) * 100)
+        })
+      }
+
+      trafficRank.value = rankList
       totalTraffic.value = String(res.data.totalTraffic || '0')
       totalDeviceCount.value = trafficRank.value.length
     }

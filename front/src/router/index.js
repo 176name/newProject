@@ -13,8 +13,8 @@ import Screenshots from '../views/Screenshots.vue'
 
 // 路由守卫
 const checkAuth = (to, from, next) => {
-    const isLogin = localStorage.getItem('isLogin')
-    if (to.path !== '/login' && isLogin !== 'true') {
+    const token = localStorage.getItem('token')
+    if (to.path !== '/login' && !token) {
         next('/login')
     } else {
         next()
